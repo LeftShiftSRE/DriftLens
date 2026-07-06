@@ -1,0 +1,24 @@
+version: 1
+services:
+  - name: checkout
+    paths:
+      - "src/checkout/**"
+    owner: marcus
+    dependencies:
+      - user
+      # NOTE: `payments` is intentionally NOT declared here, but the code in
+      # src/checkout/checkout-service.ts imports it — this is the drift the
+      # detector catches. Add `payments` to fix the health score.
+
+  - name: user
+    paths:
+      - "src/user/**"
+    owner: alice
+
+  - name: payments
+    paths:
+      - "src/payments/**"
+    owner: priya
+    dependencies:
+      # Declared but never actually imported -> "unused-declared-dependency" warning.
+      - user

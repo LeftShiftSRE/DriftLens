@@ -1,0 +1,25 @@
+{
+  "name": "driftlens",
+  "version": "0.0.0",
+  "private": true,
+  "description": "See what your code is doing to your architecture — live, in the IDE, before it hits production.",
+  "license": "Apache-2.0",
+  "packageManager": "pnpm@10.2.1",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "clean": "pnpm -r clean",
+    "analyze:sample": "pnpm --filter @driftlens/engine build && node scripts/analyze-sample.mjs",
+    "preview": "pnpm --filter @driftlens/engine build && node scripts/preview.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

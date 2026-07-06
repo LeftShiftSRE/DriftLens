@@ -1,0 +1,59 @@
+{
+  "name": "driftlens",
+  "displayName": "DriftLens",
+  "description": "See what your code is doing to your architecture — live, in the IDE.",
+  "version": "0.0.1",
+  "publisher": "driftlens",
+  "license": "Apache-2.0",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Visualization", "Linters", "Other"],
+  "main": "./dist/extension.js",
+  "activationEvents": ["workspaceContains:.driftlens.yml"],
+  "contributes": {
+    "commands": [
+      {
+        "command": "driftlens.showArchitecture",
+        "title": "Show Architecture",
+        "category": "DriftLens"
+      },
+      {
+        "command": "driftlens.refresh",
+        "title": "Refresh Analysis",
+        "category": "DriftLens"
+      }
+    ],
+    "configuration": {
+      "title": "DriftLens",
+      "properties": {
+        "driftlens.include": {
+          "type": "string",
+          "default": "**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}",
+          "description": "Glob for files to analyze."
+        },
+        "driftlens.exclude": {
+          "type": "string",
+          "default": "**/{node_modules,dist,out,build,.git}/**",
+          "description": "Glob for files to exclude from analysis."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "test": "node -e \"process.stdout.write('no extension tests yet\\n')\"",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "dependencies": {
+    "cytoscape": "^3.30.4"
+  },
+  "devDependencies": {
+    "@types/cytoscape": "^3.21.9",
+    "@types/vscode": "^1.85.0",
+    "esbuild": "^0.24.2"
+  }
+}
