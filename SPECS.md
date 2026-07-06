@@ -275,8 +275,8 @@ These specs make DriftLens a **context engine**, not just a visualizer. Skip the
 
 ---
 
-### 🟡 SPEC-016: Unified Architecture Data Model
-**Component:** engine | **Phase:** 1.5 | **Status:** 🟡 (in progress — code merged on `spec/016-unified-model`)
+### ✅ SPEC-016: Unified Architecture Data Model
+**Component:** engine | **Phase:** 1.5 | **Status:** ✅ done (merged via `spec/016-unified-model`, tagged `spec-016-merged`)
 **Goal:** One node/edge schema supporting services, components, modules, classes, contracts, ADRs, specs, owners — with provenance.
 **Why:** File graph ≠ architecture. Every node/edge has a `source` (code | yaml | doc | spec) so we can show where knowledge came from.
 
