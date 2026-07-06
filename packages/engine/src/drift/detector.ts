@@ -1,6 +1,8 @@
 import type { GraphView } from "../graph/model.js";
+import type { UnifiedGraph } from "../model/unified.js";
+import { liftGraphView } from "../graph/project.js";
 import type { DriftConfig } from "./config.js";
-import { matchGlob } from "./glob.js";
+import { firstMatchingService } from "./assign.js";
 
 export type DriftSeverity = "error" | "warning" | "info";
 
@@ -38,10 +40,32 @@ export interface DriftReport {
 
 /**
  * Compare the actual code graph against the declared architecture and produce a
- * {@link DriftReport}. Pure and deterministic — no I/O, no LLM.
+ * {@link DriftReport}. Backward-compatible entry point: lifts the legacy
+ * {@link GraphView} into the unified model and delegates to
+ * {@link detectDriftUnified}. Pure and deterministic — no I/O, no LLM.
  */
 export function detectDrift(graph: GraphView, config: DriftConfig): DriftReport {
-  const serviceOf = buildFileServiceMap(graph, config);
+  return detectDriftUnified(liftGraphView(graph), config);
+}
+
+/**
+ * The drift detector, operating natively on the {@link UnifiedGraph}. Reads
+ * `module` nodes (assigned to services by {@link firstMatchingService}) and
+ * `imports` edges between them. Output is byte-identical to the legacy detector
+ * for the same code (see `tests/drift-equivalence.test.ts`).
+ */
+export function detectDriftUnified(graph: UnifiedGraph, config: DriftConfig): DriftReport {
+  // Map each module node to its owning service (or null), plus its bare path so
+  // report messages/paths match the legacy detector exactly.
+  const serviceOf = new Map<string, string | null>();
+  const pathOf = new Map<string, string>();
+  for (const node of graph.nodes) {
+    if (node.kind !== "module") continue;
+    const path = node.filePath ?? node.id;
+    serviceOf.set(node.id, firstMatchingService(path, config));
+    pathOf.set(node.id, path);
+  }
+
   const declaredDeps = new Map<string, Set<string>>();
   for (const svc of config.services) declaredDeps.set(svc.name, new Set(svc.dependencies));
 
@@ -59,10 +83,12 @@ export function detectDrift(graph: GraphView, config: DriftConfig): DriftReport 
   let violating = 0;
 
   for (const edge of graph.edges) {
-    if (edge.type !== "import") continue;
-    const from = serviceOf.get(edge.source);
-    const to = serviceOf.get(edge.target);
-    if (!from || !to || from === to) continue; // intra-service or unassigned — not a drift signal here
+    if (edge.type !== "imports") continue;
+    const from = serviceOf.get(edge.from);
+    const to = serviceOf.get(edge.to);
+    // undefined => endpoint is not a module (e.g. an external package); null =>
+    // module belongs to no service. Either way, not a cross-service drift signal.
+    if (!from || !to || from === to) continue;
 
     observedDeps.get(from)?.add(to);
 
@@ -73,7 +99,7 @@ export function detectDrift(graph: GraphView, config: DriftConfig): DriftReport 
       violatingEdges.push(`${from}->${to}`);
       const key = `${from}->${to}`;
       const entry = undeclared.get(key) ?? { source: from, target: to, files: new Set<string>() };
-      entry.files.add(edge.source);
+      entry.files.add(pathOf.get(edge.from)!);
       undeclared.set(key, entry);
     }
   }
@@ -108,7 +134,7 @@ export function detectDrift(graph: GraphView, config: DriftConfig): DriftReport 
   // Files that belong to no declared service.
   const unassigned = [...serviceOf.entries()]
     .filter(([, svc]) => svc === null)
-    .map(([path]) => path)
+    .map(([id]) => pathOf.get(id)!)
     .sort();
   if (unassigned.length > 0) {
     events.push({
@@ -123,7 +149,7 @@ export function detectDrift(graph: GraphView, config: DriftConfig): DriftReport 
   const healthScore = checked === 0 ? 100 : Math.round((compliant / checked) * 100);
 
   const serviceOfFile: Record<string, string | null> = {};
-  for (const [path, svc] of serviceOf) serviceOfFile[path] = svc;
+  for (const [id, svc] of serviceOf) serviceOfFile[pathOf.get(id)!] = svc;
 
   return {
     events: sortEvents(events),
@@ -131,23 +157,6 @@ export function detectDrift(graph: GraphView, config: DriftConfig): DriftReport 
     serviceOfFile,
     violatingEdges: [...new Set(violatingEdges)].sort(),
   };
-}
-
-/** Map every file node to its owning service (first matching service wins), or null. */
-function buildFileServiceMap(graph: GraphView, config: DriftConfig): Map<string, string | null> {
-  const result = new Map<string, string | null>();
-  for (const node of graph.nodes) {
-    if (node.type !== "file") continue;
-    let owner: string | null = null;
-    for (const svc of config.services) {
-      if (svc.paths.some((glob) => matchGlob(glob, node.id))) {
-        owner = svc.name;
-        break;
-      }
-    }
-    result.set(node.id, owner);
-  }
-  return result;
 }
 
 const SEVERITY_ORDER: Record<DriftSeverity, number> = { error: 0, warning: 1, info: 2 };

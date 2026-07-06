@@ -7,6 +7,7 @@ import type {
   LanguageParser,
   ParsedFile,
 } from "../model.js";
+import { fnv1a } from "../util/hash.js";
 
 /**
  * TypeScript / JavaScript parser built on the TypeScript compiler API.
@@ -59,7 +60,14 @@ export class TypeScriptParser implements LanguageParser {
       }
     }
 
-    return { path: normalizePath(path), language: this.language, imports, exports, definitions };
+    return {
+      path: normalizePath(path),
+      language: this.language,
+      imports,
+      exports,
+      definitions,
+      contentHash: fnv1a(source),
+    };
   }
 }
 

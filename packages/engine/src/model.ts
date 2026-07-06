@@ -63,6 +63,13 @@ export interface ParsedFile {
   readonly imports: readonly ImportRef[];
   readonly exports: readonly ExportRef[];
   readonly definitions: readonly Definition[];
+  /**
+   * A content fingerprint of the source text at parse time (see
+   * {@link import("./util/hash.js").fnv1a}). Feeds node/edge provenance and
+   * change detection in the unified model. Optional so parsers that do not
+   * hash stay valid; the first-party TypeScript parser always sets it.
+   */
+  readonly contentHash?: string;
 }
 
 /**

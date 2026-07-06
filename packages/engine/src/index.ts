@@ -25,11 +25,37 @@ export { CodeGraph } from "./graph/builder.js";
 export { resolveImport, isRelative } from "./graph/resolve.js";
 export type { EdgeType, GraphEdge, GraphNode, GraphView, NodeType } from "./graph/model.js";
 
+// Unified architecture data model (SPEC-016)
+export type {
+  AttrValue,
+  Provenance,
+  SourceKind,
+  UnifiedEdge,
+  UnifiedEdgeType,
+  UnifiedGraph,
+  UnifiedNode,
+  UnifiedNodeKind,
+} from "./model/unified.js";
+export {
+  buildUnifiedGraph,
+  moduleId,
+  externalId,
+  serviceId,
+  ownerId,
+} from "./graph/unified-builder.js";
+export type { BuildOptions } from "./graph/unified-builder.js";
+export { projectCodeGraph, liftGraphView } from "./graph/project.js";
+export { createQuery } from "./graph/query.js";
+export type { GraphQuery, NeighborOpts, UnifiedSubgraph } from "./graph/query.js";
+export { fnv1a } from "./util/hash.js";
+export { slug } from "./util/slug.js";
+
 // Drift
 export { parseConfig, ConfigError } from "./drift/config.js";
 export type { DriftConfig, ServiceSpec } from "./drift/config.js";
-export { detectDrift } from "./drift/detector.js";
+export { detectDrift, detectDriftUnified } from "./drift/detector.js";
 export type { DriftEvent, DriftKind, DriftReport, DriftSeverity } from "./drift/detector.js";
+export { firstMatchingService } from "./drift/assign.js";
 export { matchGlob, globToRegExp } from "./drift/glob.js";
 
 // High-level convenience

@@ -86,6 +86,15 @@ export default x;
     expect(result.imports[0]?.moduleSpecifier).toBe("react");
     expect(result.definitions.some((d) => d.name === "App")).toBe(true);
   });
+
+  it("stamps a stable content hash for provenance", () => {
+    const src = `export const a = 1;`;
+    const a = typeScriptParser.parse("src/a.ts", src);
+    const b = typeScriptParser.parse("src/a.ts", src);
+    expect(a.contentHash).toMatch(/^[0-9a-f]{8}$/);
+    expect(a.contentHash).toBe(b.contentHash);
+    expect(typeScriptParser.parse("src/a.ts", `export const a = 2;`).contentHash).not.toBe(a.contentHash);
+  });
 });
 
 describe("ParserRegistry", () => {
