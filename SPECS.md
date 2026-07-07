@@ -385,7 +385,17 @@ lands (they are ordinary `UnifiedNode`s). Effective dependency: SPEC-016.
    (Decision View Renderer); the edges are produced here, the renderer consumes them.
 
 **Depends on:** SPEC-016 (SPEC-017 listed in the plan but not required — see note above)
-**Acceptance:** Loading the sample repo produces `document` nodes for README + `adr` (`Decision`) nodes for each ADR; the graph carries ADR→component (`decided_by`) edges.
+**Acceptance (verified on `spec/018-doc-ingestion`, flips to ✅ on merge to main):**
+- [x] Loading the sample repo produces `document` nodes for README/docs (2) +
+  `adr` (`Decision`) nodes for each ADR (2). *(`node scripts/analyze-sample.mjs`)*
+- [x] The graph carries ADR→component (`decided_by`) edges (3) and doc→code
+  (`references`) edges (6).
+- [x] Doc/adr nodes are queryable: `createQuery.decisionsFor("checkout")` and
+  `documentsFor("src/checkout/checkout-service.ts")` return the expected nodes.
+- [x] Legacy view + drift unchanged: `projectCodeGraph`/detector ignore the new
+  kinds; `drift-equivalence.test.ts` still green; sample drift report still 50%.
+- [x] `pnpm -r test` — 87/87 · `pnpm -r typecheck` clean · `pnpm -r build` (incl.
+  extension bundle) clean.
 **Effort:** L
 
 ---
