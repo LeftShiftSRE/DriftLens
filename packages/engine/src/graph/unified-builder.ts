@@ -10,6 +10,7 @@ import type {
 import type { DriftConfig } from "../drift/config.js";
 import { firstMatchingService } from "../drift/assign.js";
 import { slug } from "../util/slug.js";
+import { buildDocGraph, type DocInput } from "../ingest/docs.js";
 import { isRelative, resolveImport } from "./resolve.js";
 
 /** Conventional path recorded as the provenance of config-derived nodes. */
@@ -23,6 +24,14 @@ export interface BuildOptions {
    * is identical either way).
    */
   readonly config?: DriftConfig;
+  /**
+   * Markdown docs to ingest (SPEC-018). When present, the graph also carries
+   * `document` / `adr` nodes and `references` / `decided_by` edges. Links are
+   * resolved against the parsed code files, so docs see the same file set as the
+   * code graph. Purely additive: {@link import("./project.js").projectCodeGraph}
+   * ignores these kinds, so the legacy view is unchanged either way.
+   */
+  readonly docs?: Iterable<DocInput>;
 }
 
 /**
@@ -166,6 +175,13 @@ export function buildUnifiedGraph(
         source: yaml(),
       });
     }
+  }
+
+  // ── Doc-derived nodes/edges from Markdown (SPEC-018) ──
+  if (options.docs) {
+    const docGraph = buildDocGraph(options.docs, { knownFiles, ...(config ? { config } : {}) });
+    for (const node of docGraph.nodes) addNode(node);
+    for (const edge of docGraph.edges) addEdge(edge);
   }
 
   return {

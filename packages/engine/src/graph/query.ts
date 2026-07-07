@@ -36,10 +36,23 @@ export interface GraphQuery {
   neighbors(id: string, opts?: NeighborOpts): readonly UnifiedNode[];
   /**
    * A component's context subgraph: the `service` node named `name`, its member
-   * modules and their contained symbols, imports among members, the owner, and
-   * declared dependencies. Powers `query_component` in the MCP server.
+   * modules and their contained symbols, imports among members, the owner,
+   * declared dependencies, and any ADRs that decide it. Powers `query_component`
+   * in the MCP server.
    */
   component(name: string): UnifiedSubgraph;
+  /**
+   * The ADRs that govern a service — the `adr` nodes linked to `service:<name>`
+   * by a `decided_by` edge (SPEC-018). Foundation of the Decision View
+   * (SPEC-021) and the MCP `get_decision_history` tool (SPEC-020).
+   */
+  decisionsFor(name: string): readonly UnifiedNode[];
+  /**
+   * The docs that point at a code node — the `document`/`adr` nodes with a
+   * `references` edge to the given target. `target` may be a node id or a file
+   * path (resolved to its `module` node). Answers "which docs mention this file?".
+   */
+  documentsFor(target: string): readonly UnifiedNode[];
 }
 
 export function createQuery(graph: UnifiedGraph): GraphQuery {
@@ -123,6 +136,27 @@ export function createQuery(graph: UnifiedGraph): GraphQuery {
     return { root, nodes: [...nodeSet.values()], edges: [...edgeSet.values()] };
   };
 
+  const decisionsFor = (name: string): UnifiedNode[] => {
+    // `decided_by` is service → adr, so the ADRs are out-neighbors of the service.
+    return neighbors(serviceId(name), { edgeType: "decided_by", direction: "out" }).filter(
+      (n) => n.kind === "adr",
+    );
+  };
+
+  const documentsFor = (target: string): UnifiedNode[] => {
+    // Accept a node id directly, else treat `target` as a file path.
+    const nodeId = byId.has(target) ? target : moduleId(target);
+    const docs: UnifiedNode[] = [];
+    const seen = new Set<string>();
+    for (const edge of inEdges.get(nodeId) ?? []) {
+      if (edge.type !== "references" || seen.has(edge.from)) continue;
+      seen.add(edge.from);
+      const from = byId.get(edge.from);
+      if (from && (from.kind === "document" || from.kind === "adr")) docs.push(from);
+    }
+    return docs;
+  };
+
   return {
     graph,
     node: (id) => byId.get(id),
@@ -131,6 +165,8 @@ export function createQuery(graph: UnifiedGraph): GraphQuery {
     edgesOf,
     neighbors,
     component,
+    decisionsFor,
+    documentsFor,
   };
 }
 
