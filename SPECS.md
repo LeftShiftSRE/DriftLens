@@ -333,28 +333,59 @@ These specs make DriftLens a **context engine**, not just a visualizer. Skip the
 
 ---
 
-### ⛔ SPEC-018: Documentation Ingestion
-**Component:** engine | **Phase:** 1.5 | **Status:** ⛔ (MISSING — high value)
+### 🟡 SPEC-018: Documentation Ingestion
+**Component:** engine | **Phase:** 1.5 | **Status:** 🟡 in progress (`spec/018-doc-ingestion`)
 **Goal:** Parse README, docs/, adr/; extract sections + link them to code nodes.
 **Why:** Architecture intent lives in docs. Without this, DriftLens can't answer "why is this component here?"
 
-**Technical decisions to make:**
-- [ ] Markdown parser: unified/remark vs custom?
-- [ ] Link extraction: `[text](./path)` → link doc section to file/symbol.
-- [ ] ADR auto-detection: filename pattern (`adr/NNNN-*.md`) vs frontmatter vs both?
-- [ ] Embedding strategy for semantic search: sentence-transformers local model, or LLM-on-demand only?
+**Technical decisions (resolved for SPEC-018):**
+- [x] **Markdown parser: custom, dependency-free.** Same rationale as the FNV-1a
+  hash and YAML-free config path elsewhere in the engine: the engine is bundled
+  into the VS Code webview by esbuild (ADR 0002), so we avoid the `unified`/`remark`
+  dependency tree. We only need headings (→ sections), links, and frontmatter —
+  a small hand-written line scanner covers that. Fenced code blocks are respected
+  so `#`-comments and `[x](y)` inside code samples don't produce phantom sections
+  or links. Lives in `packages/engine/src/ingest/markdown.ts`.
+- [x] **Link extraction:** inline `[text](target)` links are extracted with the
+  heading section they appear under. A link whose `target` (after stripping any
+  `#anchor`/query and URL-decoding) resolves — relative to the doc's own
+  directory — to a known project file becomes a `references` edge
+  `document|adr → module`. Off-repo links (`http(s):`, `mailto:`, bare anchors)
+  are ignored for edges. Reuses the existing `resolveImport`-style path logic.
+- [x] **ADR auto-detection: both.** A file is an ADR if its path matches
+  `**/adr/NNNN-*.md` (or `**/adr/NNNN-*.md` under `docs/`) **or** its frontmatter
+  carries a `status:` key (the ADR convention: `Accepted`/`Proposed`/…). Either
+  signal is sufficient; when both are present they agree. Non-ADR markdown
+  becomes a plain `document` node.
+- [x] **ADR → component links:** an ADR emits a `decided_by` edge
+  `service → adr` for every service it names. A service is "named" when the ADR
+  links to a file that belongs to that service (via `firstMatchingService`) **or**
+  the ADR frontmatter lists it under `components:`/`services:`. This is what draws
+  the "ADR-0007 → CheckoutService" dashed edge in the diagram (SPEC-021).
+- [x] **Embeddings: deferred.** No semantic search in v1 — link + path resolution
+  is deterministic and dependency-free, which is enough for the acceptance
+  criteria and the MCP context surface (SPEC-020). Sentence-transformers /
+  LLM-on-demand embedding is punted to a later spec; noted here so it isn't lost.
+
+**Decision-change note (dependency):** SPEC-018's spec sheet lists **SPEC-017**
+(persistence) as a dependency, but 017 is not yet built. SPEC-018 needs only the
+in-memory unified model from **SPEC-016**, so it is implemented against that and
+does **not** block on 017. Persistence will pick up doc/adr nodes for free once it
+lands (they are ordinary `UnifiedNode`s). Effective dependency: SPEC-016.
 
 **Sub-tasks:**
-1. Pick markdown parser; implement AST extraction
-2. Extract sections, headings, links
-3. Resolve file links to code nodes
-4. Auto-detect ADRs by pattern
-5. Build `Document` and `Decision` nodes
-6. Add `decision_view` query to graph
-7. Render dashed edges "ADR-007 → CheckoutService" in diagram
+1. [x] Custom markdown parser (`ingest/markdown.ts`): frontmatter, sections, links
+2. [x] Extract sections, headings, links (code-fence aware)
+3. [x] Resolve file links to code (module) nodes, relative to the doc's directory
+4. [x] Auto-detect ADRs by path pattern **and** frontmatter `status`
+5. [x] Build `document` and `adr` nodes; `references` + `decided_by` edges
+   (`ingest/docs.ts`, merged by `buildUnifiedGraph`)
+6. [x] Add `decisionsFor` / `documentsFor` to `createQuery`
+7. [ ] Render dashed "ADR → component" edges in the diagram — **SPEC-021**
+   (Decision View Renderer); the edges are produced here, the renderer consumes them.
 
-**Depends on:** SPEC-016, SPEC-017
-**Acceptance:** Loading the sample repo produces `Document` nodes for README + `Decision` nodes for each ADR; diagram shows ADR→component edges.
+**Depends on:** SPEC-016 (SPEC-017 listed in the plan but not required — see note above)
+**Acceptance:** Loading the sample repo produces `document` nodes for README + `adr` (`Decision`) nodes for each ADR; the graph carries ADR→component (`decided_by`) edges.
 **Effort:** L
 
 ---
