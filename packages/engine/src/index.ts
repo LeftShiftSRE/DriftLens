@@ -50,6 +50,23 @@ export type { GraphQuery, NeighborOpts, UnifiedSubgraph } from "./graph/query.js
 export { fnv1a } from "./util/hash.js";
 export { slug } from "./util/slug.js";
 
+// Documentation ingestion (SPEC-018)
+export { parseMarkdown } from "./ingest/markdown.js";
+export type {
+  FrontmatterValue,
+  MarkdownLink,
+  MarkdownSection,
+  ParsedMarkdown,
+} from "./ingest/markdown.js";
+export {
+  buildDocGraph,
+  documentId,
+  adrId,
+  isAdrPath,
+  resolveDocLink,
+} from "./ingest/docs.js";
+export type { DocGraph, DocGraphOptions, DocInput } from "./ingest/docs.js";
+
 // Drift
 export { parseConfig, ConfigError } from "./drift/config.js";
 export type { DriftConfig, ServiceSpec } from "./drift/config.js";

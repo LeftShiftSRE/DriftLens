@@ -88,3 +88,46 @@ services:
     expect(g.edges.some((e) => e.type === "member_of")).toBe(false);
   });
 });
+
+describe("buildUnifiedGraph — doc ingestion (SPEC-018)", () => {
+  const config = parseConfig(`
+version: 1
+services:
+  - name: checkout
+    paths: ["src/checkout/**"]
+    owner: marcus
+`);
+  const parsed = parse({
+    "src/checkout/index.ts": `export const c = 1;`,
+  });
+
+  const docs = [
+    { path: "README.md", source: "# Sample\n\n[checkout](./src/checkout/index.ts)\n" },
+    {
+      path: "docs/adr/0007-split.md",
+      source: "# ADR 0007\n- **Status:** Accepted\n\n[svc](../../src/checkout/index.ts)\n",
+    },
+  ];
+
+  it("merges document/adr nodes and references/decided_by edges into the graph", () => {
+    const g = buildUnifiedGraph(parsed, { config, docs });
+
+    expect(g.nodes.find((n) => n.id === "document:README.md")?.kind).toBe("document");
+    expect(g.nodes.find((n) => n.id === "adr:0007-split")?.kind).toBe("adr");
+    expect(
+      g.edges.some((e) => e.type === "references" && e.from === "document:README.md"),
+    ).toBe(true);
+    expect(
+      g.edges.some(
+        (e) => e.type === "decided_by" && e.from === "service:checkout" && e.to === "adr:0007-split",
+      ),
+    ).toBe(true);
+    // Still canonically sorted after the merge.
+    expect(g.nodes.map((n) => n.id)).toEqual([...g.nodes.map((n) => n.id)].sort());
+  });
+
+  it("leaves the graph code-only when no docs are given", () => {
+    const g = buildUnifiedGraph(parsed, { config });
+    expect(g.nodes.some((n) => n.kind === "document" || n.kind === "adr")).toBe(false);
+  });
+});
