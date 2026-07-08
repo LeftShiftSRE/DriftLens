@@ -400,8 +400,8 @@ lands (they are ordinary `UnifiedNode`s). Effective dependency: SPEC-016.
 
 ---
 
-### 🟡 SPEC-019: Spec Ingestion
-**Component:** engine | **Phase:** 1.5 | **Status:** 🟡 in progress (`spec/019-spec-ingestion`)
+### ✅ SPEC-019: Spec Ingestion
+**Component:** engine | **Phase:** 1.5 | **Status:** ✅ done (merged via `spec/019-spec-ingestion`, tagged `spec-019-merged`)
 **Goal:** Ingest specs (from `.spec/` folder or GitHub Issues) and link them to components being implemented.
 **Why:** The whole "AI bubble" story is about specs colliding. Specs must be first-class.
 
