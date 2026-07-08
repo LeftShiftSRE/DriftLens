@@ -1,5 +1,5 @@
 // Analyze examples/sample-repo with the built engine and print a drift report
-// plus the doc/ADR graph (SPEC-018).
+// plus the doc/ADR graph (SPEC-018) and the spec graph (SPEC-019).
 // Usage: pnpm --filter @driftlens/engine build && node scripts/analyze-sample.mjs
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -74,6 +74,28 @@ for (const svc of config.services) {
   if (decisions.length === 0) continue;
   for (const adr of decisions) {
     console.log(`  ${adr.label}  →  ${svc.name}`);
+  }
+}
+
+// ── Spec graph (SPEC-019) ──
+const specs = q.nodesByKind("spec");
+const specifiedBy = unified.edges.filter((e) => e.type === "specified_by");
+
+console.log(`\nSpecs`);
+console.log(`─────`);
+console.log(`Specs : ${specs.length}   Edges : ${specifiedBy.length} specified_by\n`);
+for (const spec of specs) {
+  const status = spec.data?.status ? ` [${spec.data.status}]` : "";
+  const owner = spec.data?.owner ? ` — ${spec.data.owner}` : "";
+  console.log(`  📋 ${spec.label}${status}${owner}  (${spec.source.path})`);
+}
+
+console.log(`\nSpecs by component`);
+console.log(`──────────────────`);
+for (const svc of config.services) {
+  for (const spec of q.specsFor(svc.name)) {
+    const status = spec.data?.status ? ` (${spec.data.status})` : "";
+    console.log(`  ${spec.label}  →  ${svc.name}${status}`);
   }
 }
 console.log();

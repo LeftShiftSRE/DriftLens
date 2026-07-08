@@ -81,6 +81,45 @@ describe("createQuery", () => {
   });
 });
 
+function buildWithSpecs() {
+  const parsed = [
+    ["src/checkout/index.ts", `export class Cart {}`],
+    ["src/user/svc.ts", `export const getUser = () => 1;`],
+  ].map(([p, s]) => typeScriptParser.parse(p!, s!));
+  const specs = [
+    {
+      path: ".spec/047-guest-checkout.spec.md",
+      source: ["---", "status: in-progress", "owner: marcus", "components: [checkout]", "---", "# Spec 047"].join("\n"),
+    },
+  ];
+  return createQuery(buildUnifiedGraph(parsed, { config, specs }));
+}
+
+describe("createQuery — specs (SPEC-019)", () => {
+  const q = buildWithSpecs();
+
+  it("indexes spec nodes by kind with their status/owner", () => {
+    const specs = q.nodesByKind("spec");
+    expect(specs.map((n) => n.id)).toEqual(["spec:047-guest-checkout"]);
+    expect(specs[0]!.data).toMatchObject({ status: "in-progress", owner: "marcus" });
+  });
+
+  it("returns the specs targeting a service", () => {
+    expect(q.specsFor("checkout").map((n) => n.id)).toEqual(["spec:047-guest-checkout"]);
+    expect(q.specsFor("user")).toEqual([]);
+  });
+
+  it("pulls the targeting spec into the component subgraph", () => {
+    const ids = new Set(q.component("checkout").nodes.map((n) => n.id));
+    expect(ids).toContain("spec:047-guest-checkout");
+    expect(
+      q.component("checkout").edges.some(
+        (e) => e.type === "specified_by" && e.to === "spec:047-guest-checkout",
+      ),
+    ).toBe(true);
+  });
+});
+
 describe("createQuery — decisions and documents (SPEC-018)", () => {
   const q = buildWithDocs();
 

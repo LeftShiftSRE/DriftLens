@@ -30,9 +30,9 @@ first-class, and records — on every node and edge — a `source` so the UI can
 | `owner` | yaml | `owner:<slug>` | SPEC-016 |
 | `component` | yaml/spec | `component:<slug>` | *reserved* (SPEC-019) |
 | `contract` | code | `contract:<path>#<name>` | *reserved* (SPEC-023) |
-| `adr` | doc | `adr:<slug>` | *reserved* (SPEC-018) |
-| `spec` | spec | `spec:<slug>` | *reserved* (SPEC-019) |
-| `document` | doc | `document:<path>` | *reserved* (SPEC-018) |
+| `adr` | doc | `adr:<slug>` | SPEC-018 |
+| `spec` | spec | `spec:<slug>` | SPEC-019 |
+| `document` | doc | `document:<path>` | SPEC-018 |
 
 ## Edge types
 
@@ -44,10 +44,10 @@ first-class, and records — on every node and edge — a `source` so the UI can
 | `owns` | owner → service | yaml | SPEC-016 |
 | `depends_on` | service → service (declared) | yaml | SPEC-016 |
 | `implements` | class → contract | code | *reserved* (SPEC-023) |
-| `decided_by` | service → adr | doc | *reserved* (SPEC-018) |
-| `specified_by` | component → spec | spec | *reserved* (SPEC-019) |
+| `decided_by` | service → adr | doc | SPEC-018 |
+| `specified_by` | service → spec | spec | SPEC-019 |
 | `contradicts` | code/spec → adr | doc/spec | *reserved* (SPEC-018/019) |
-| `references` | document → any | doc | *reserved* (SPEC-018) |
+| `references` | document → any | doc | SPEC-018 |
 
 Edge endpoints are named `from`/`to` (not `source`/`target`) so that `.source`
 is a single, uniform **provenance** accessor on both nodes and edges.
@@ -119,8 +119,17 @@ the foundation the MCP server (SPEC-020) exposes as context tools.
 Later specs add *builders* that merge their nodes/edges into the same
 `UnifiedGraph` — the schema and query layer do not change:
 
-- **SPEC-018** (docs): `document`/`adr` nodes, `references`/`decided_by` edges.
-- **SPEC-019** (specs): `spec`/`component` nodes, `specified_by` edges.
+- **SPEC-018** (docs, ✅): `document`/`adr` nodes, `references`/`decided_by`
+  edges. Built by [`ingest/docs.ts`](../packages/engine/src/ingest/docs.ts).
+- **SPEC-019** (specs, ✅): `spec` nodes, `specified_by` edges. Built by
+  [`ingest/specs.ts`](../packages/engine/src/ingest/specs.ts). A spec is any
+  `*.spec.md` file; it is `specified_by`-linked to every `service` it names
+  (frontmatter `components:`/`services:`, or a Markdown link resolving to one of
+  the service's files). The edge is `service → spec` until component-level nodes
+  exist (SPEC-005 v2), mirroring SPEC-018's `service → adr`; the builder emits
+  `component → spec` unchanged once they do. `createQuery.specsFor(service)`
+  reads them back, and `component(name)` pulls the targeting specs into the
+  context subgraph.
 - **SPEC-023** (contracts): `contract` nodes, `implements` edges.
 
 ## Migration & compatibility

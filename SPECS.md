@@ -333,8 +333,8 @@ These specs make DriftLens a **context engine**, not just a visualizer. Skip the
 
 ---
 
-### 🟡 SPEC-018: Documentation Ingestion
-**Component:** engine | **Phase:** 1.5 | **Status:** 🟡 in progress (`spec/018-doc-ingestion`)
+### ✅ SPEC-018: Documentation Ingestion
+**Component:** engine | **Phase:** 1.5 | **Status:** ✅ done (merged via `spec/018-doc-ingestion`, tagged `spec-018-merged`)
 **Goal:** Parse README, docs/, adr/; extract sections + link them to code nodes.
 **Why:** Architecture intent lives in docs. Without this, DriftLens can't answer "why is this component here?"
 
@@ -385,7 +385,7 @@ lands (they are ordinary `UnifiedNode`s). Effective dependency: SPEC-016.
    (Decision View Renderer); the edges are produced here, the renderer consumes them.
 
 **Depends on:** SPEC-016 (SPEC-017 listed in the plan but not required — see note above)
-**Acceptance (verified on `spec/018-doc-ingestion`, flips to ✅ on merge to main):**
+**Acceptance (verified on `spec/018-doc-ingestion`, merged to main):**
 - [x] Loading the sample repo produces `document` nodes for README/docs (2) +
   `adr` (`Decision`) nodes for each ADR (2). *(`node scripts/analyze-sample.mjs`)*
 - [x] The graph carries ADR→component (`decided_by`) edges (3) and doc→code
@@ -400,24 +400,73 @@ lands (they are ordinary `UnifiedNode`s). Effective dependency: SPEC-016.
 
 ---
 
-### ⛔ SPEC-019: Spec Ingestion
-**Component:** engine | **Phase:** 1.5 | **Status:** ⛔ (MISSING — high value)
+### 🟡 SPEC-019: Spec Ingestion
+**Component:** engine | **Phase:** 1.5 | **Status:** 🟡 in progress (`spec/019-spec-ingestion`)
 **Goal:** Ingest specs (from `.spec/` folder or GitHub Issues) and link them to components being implemented.
 **Why:** The whole "AI bubble" story is about specs colliding. Specs must be first-class.
 
-**Technical decisions to make:**
-- [ ] Spec format: `.spec/NNN-slug.md` with YAML frontmatter? Or just GitHub Issues API?
-- [ ] How does a spec link to components? (Frontmatter field, or inferred from file paths?)
-- [ ] Status tracking: proposed / in-progress / shipped / abandoned?
+**Technical decisions (resolved for SPEC-019):**
+- [x] **Spec format: `.spec.md`, local-first, dependency-free — Issues deferred.**
+  A spec is any Markdown file whose name ends `.spec.md` (typically under a
+  `.spec/` or `spec/` folder, e.g. `.spec/047-checkout-flow.spec.md`). It is
+  parsed by the *same* hand-rolled `parseMarkdown` scanner SPEC-018 already
+  ships — no new dependency, and specs get frontmatter + sections + links for
+  free. This honors CD-001 (local-first) and open question #3's "both, start
+  with `.spec.md`": the GitHub Issues source is a later, additive spec (needs
+  network + auth, out of scope for the deterministic core).
+- [x] **How a spec links to components: frontmatter first, links as a fallback.**
+  A spec names its targets explicitly via a `components:`/`services:` frontmatter
+  list (the authoritative signal — same convention ADR frontmatter uses in
+  SPEC-018), **and** any Markdown link whose target resolves to a project file is
+  attributed to that file's owning service via `firstMatchingService`. The union
+  is the set of services the spec is `specified_by`. Path *inference from a glob*
+  like `src/checkout/*` is expressed as a resolvable link or an explicit
+  frontmatter entry — we do **not** add a second glob engine here; the acceptance
+  criterion ("a spec that mentions `src/checkout/*`") is met by a link to a file
+  under that path resolving to the `checkout` service.
+- [x] **Edge shape: `specified_by`, `service → spec` (component when it exists).**
+  The reserved edge in the unified model is `specified_by` (SPEC-016). Until
+  component-level declarations land (SPEC-005 v2), the "component" a spec targets
+  is a **`service`** node — exactly as SPEC-018's `decided_by` attaches ADRs to
+  services. Edge direction mirrors `decided_by`: the governed node (`service`)
+  is `from`, the governing artifact (`spec`) is `to`, so both decision- and
+  spec-governance read the same way and the component subgraph pulls them in
+  identically. When `component` nodes exist, the same builder emits
+  `component → spec` with no schema change.
+- [x] **Status tracking: free-text scalar carried on the node, not enumerated.**
+  A spec's `status:` frontmatter (`proposed` / `in-progress` / `shipped` /
+  `abandoned`, or anything else) is copied verbatim onto the `spec` node's
+  `data.status`, alongside `owner`. We do **not** validate the vocabulary — the
+  engine stays deterministic and unopinionated; the diagram/UI (SPEC-021) and
+  spec-collision detector (SPEC-027) interpret it. `title` comes from the first
+  H1, matching document/adr nodes.
+
+**Decision-change note (dependency):** the spec sheet lists **SPEC-016** as the
+only dependency, which holds — this needs just the in-memory unified model and
+the SPEC-018 markdown/ingest primitives (both merged to `main`). No dependency on
+SPEC-017 (persistence): `spec` nodes are ordinary `UnifiedNode`s and persistence
+picks them up for free when it lands. Sub-task 4 ("render in diagram") is
+**SPEC-021**'s job (Decision/Spec view renderer) — this spec *produces* the
+`spec` nodes and `specified_by` edges; the renderer consumes them, exactly as
+SPEC-018 produced `decided_by` edges for SPEC-021 to draw.
 
 **Sub-tasks:**
-1. Define `.spec.md` format with frontmatter (status, owner, components)
-2. Implement parser
-3. Build `Spec` nodes, link to `Component` nodes
-4. Render in diagram: "Spec-047 → CheckoutFlow (in progress, Marcus)"
+1. [x] `.spec.md` format: frontmatter (`status`, `owner`, `components`/`services`)
+   + sections + links, read by the existing `parseMarkdown`.
+2. [x] Spec-graph builder (`ingest/specs.ts`): `spec` nodes + `specified_by`
+   edges, deterministic and canonically sorted (mirrors `ingest/docs.ts`).
+3. [x] Build `spec` nodes and link them to `service` nodes; merged by
+   `buildUnifiedGraph` via a new `specs` build option; `analyzeProject`
+   auto-collects `*.spec.md` files (checked before generic `.md` doc routing).
+4. [ ] Render in diagram: "Spec-047 → CheckoutFlow (in progress, Marcus)" —
+   **SPEC-021** (Decision/Spec View Renderer). Edges produced here.
+5. [x] `specsFor(service)` on `createQuery`; spec nodes pulled into
+   `component(name)` subgraph.
 
-**Depends on:** SPEC-016
-**Acceptance:** A spec that mentions `src/checkout/*` creates a `Spec → Component` edge; shown in diagram.
+**Depends on:** SPEC-016 (uses SPEC-018 ingest primitives, both merged)
+**Acceptance:** A spec that mentions `src/checkout/*` creates a `Spec → Component`
+edge; shown in diagram *(edge produced here and asserted in tests + the sample
+analysis; the diagram toggle is SPEC-021)*.
 **Effort:** M
 
 ---

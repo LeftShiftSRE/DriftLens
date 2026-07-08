@@ -67,6 +67,10 @@ export {
 } from "./ingest/docs.js";
 export type { DocGraph, DocGraphOptions, DocInput } from "./ingest/docs.js";
 
+// Spec ingestion (SPEC-019)
+export { buildSpecGraph, specId, isSpecPath } from "./ingest/specs.js";
+export type { SpecGraph, SpecGraphOptions, SpecInput } from "./ingest/specs.js";
+
 // Drift
 export { parseConfig, ConfigError } from "./drift/config.js";
 export type { DriftConfig, ServiceSpec } from "./drift/config.js";

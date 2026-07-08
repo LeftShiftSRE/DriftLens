@@ -3,6 +3,7 @@ import type { UnifiedGraph } from "./model/unified.js";
 import type { ParsedFile } from "./model.js";
 import { buildUnifiedGraph } from "./graph/unified-builder.js";
 import type { DocInput } from "./ingest/docs.js";
+import { isSpecPath, type SpecInput } from "./ingest/specs.js";
 import { projectCodeGraph } from "./graph/project.js";
 import { defaultRegistry, ParserRegistry } from "./parser/registry.js";
 import { detectDriftUnified, type DriftReport } from "./drift/detector.js";
@@ -34,6 +35,13 @@ export interface AnalyzeOptions {
    * outside the code `files` map (or `[]` to disable doc ingestion entirely).
    */
   readonly docs?: Iterable<DocInput>;
+  /**
+   * Specs to ingest (SPEC-019). When omitted, any `*.spec.md` files in `files`
+   * are auto-collected as specs (checked *before* the generic `.md` doc routing,
+   * since a spec filename also ends in `.md`). Pass an explicit list to ingest
+   * specs that live outside the code `files` map (or `[]` to disable entirely).
+   */
+  readonly specs?: Iterable<SpecInput>;
 }
 
 /**
@@ -51,10 +59,20 @@ export function analyzeProject(
   const parsed: ParsedFile[] = [];
   const skipped: string[] = [];
   const collectedDocs: DocInput[] = [];
+  const collectedSpecs: SpecInput[] = [];
   const explicitDocs = options.docs !== undefined;
+  const explicitSpecs = options.specs !== undefined;
 
   for (const [path, source] of files) {
-    if (!explicitDocs && isDocPath(path)) {
+    // Spec files (`*.spec.md`) are checked first — they also end in `.md`, so a
+    // spec would otherwise be swallowed by the generic doc router below.
+    if (!explicitSpecs && isSpecPath(path)) {
+      collectedSpecs.push({ path, source });
+      continue;
+    }
+    // `isSpecPath` guard: a `*.spec.md` file is never a doc, even when specs are
+    // supplied explicitly (it just isn't auto-collected in that case).
+    if (!explicitDocs && isDocPath(path) && !isSpecPath(path)) {
       collectedDocs.push({ path, source });
       continue;
     }
@@ -64,9 +82,11 @@ export function analyzeProject(
   }
 
   const docs = explicitDocs ? options.docs : collectedDocs;
+  const specs = explicitSpecs ? options.specs : collectedSpecs;
   const unified = buildUnifiedGraph(parsed, {
     ...(options.config ? { config: options.config } : {}),
     ...(docs ? { docs } : {}),
+    ...(specs ? { specs } : {}),
   });
   const graph = projectCodeGraph(unified);
   const drift = options.config ? detectDriftUnified(unified, options.config) : undefined;

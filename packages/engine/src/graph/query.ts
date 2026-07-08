@@ -37,8 +37,8 @@ export interface GraphQuery {
   /**
    * A component's context subgraph: the `service` node named `name`, its member
    * modules and their contained symbols, imports among members, the owner,
-   * declared dependencies, and any ADRs that decide it. Powers `query_component`
-   * in the MCP server.
+   * declared dependencies, any ADRs that decide it, and any specs that target it.
+   * Powers `query_component` in the MCP server.
    */
   component(name: string): UnifiedSubgraph;
   /**
@@ -53,6 +53,12 @@ export interface GraphQuery {
    * path (resolved to its `module` node). Answers "which docs mention this file?".
    */
   documentsFor(target: string): readonly UnifiedNode[];
+  /**
+   * The specs targeting a service — the `spec` nodes linked to `service:<name>`
+   * by a `specified_by` edge (SPEC-019). Foundation of the Spec view (SPEC-021)
+   * and spec-collision detection (SPEC-027).
+   */
+  specsFor(name: string): readonly UnifiedNode[];
 }
 
 export function createQuery(graph: UnifiedGraph): GraphQuery {
@@ -143,6 +149,13 @@ export function createQuery(graph: UnifiedGraph): GraphQuery {
     );
   };
 
+  const specsFor = (name: string): UnifiedNode[] => {
+    // `specified_by` is service → spec, so specs are out-neighbors of the service.
+    return neighbors(serviceId(name), { edgeType: "specified_by", direction: "out" }).filter(
+      (n) => n.kind === "spec",
+    );
+  };
+
   const documentsFor = (target: string): UnifiedNode[] => {
     // Accept a node id directly, else treat `target` as a file path.
     const nodeId = byId.has(target) ? target : moduleId(target);
@@ -167,6 +180,7 @@ export function createQuery(graph: UnifiedGraph): GraphQuery {
     component,
     decisionsFor,
     documentsFor,
+    specsFor,
   };
 }
 

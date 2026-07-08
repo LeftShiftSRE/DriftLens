@@ -11,6 +11,7 @@ import type { DriftConfig } from "../drift/config.js";
 import { firstMatchingService } from "../drift/assign.js";
 import { slug } from "../util/slug.js";
 import { buildDocGraph, type DocInput } from "../ingest/docs.js";
+import { buildSpecGraph, type SpecInput } from "../ingest/specs.js";
 import { isRelative, resolveImport } from "./resolve.js";
 
 /** Conventional path recorded as the provenance of config-derived nodes. */
@@ -32,6 +33,13 @@ export interface BuildOptions {
    * ignores these kinds, so the legacy view is unchanged either way.
    */
   readonly docs?: Iterable<DocInput>;
+  /**
+   * Specs to ingest (SPEC-019). When present, the graph also carries `spec`
+   * nodes and `specified_by` (service → spec) edges. Like `docs`, links are
+   * resolved against the parsed code files and services come from `config`.
+   * Purely additive: the legacy projection ignores these kinds.
+   */
+  readonly specs?: Iterable<SpecInput>;
 }
 
 /**
@@ -182,6 +190,13 @@ export function buildUnifiedGraph(
     const docGraph = buildDocGraph(options.docs, { knownFiles, ...(config ? { config } : {}) });
     for (const node of docGraph.nodes) addNode(node);
     for (const edge of docGraph.edges) addEdge(edge);
+  }
+
+  // ── Spec-derived nodes/edges from `.spec.md` files (SPEC-019) ──
+  if (options.specs) {
+    const specGraph = buildSpecGraph(options.specs, { knownFiles, ...(config ? { config } : {}) });
+    for (const node of specGraph.nodes) addNode(node);
+    for (const edge of specGraph.edges) addEdge(edge);
   }
 
   return {
