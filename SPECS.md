@@ -471,8 +471,8 @@ analysis; the diagram toggle is SPEC-021)*.
 
 ---
 
-### 🟡 SPEC-020: MCP Server (Context API)
-**Component:** server | **Phase:** 1.5 | **Status:** 🟡 in progress (`spec/020-mcp-server`)
+### ✅ SPEC-020: MCP Server (Context API)
+**Component:** server | **Phase:** 1.5 | **Status:** ✅ done (merged via `spec/020-mcp-server`, tagged `spec-020-merged`)
 **Goal:** Expose the graph as MCP (Model Context Protocol) tools so Cursor / Continue / Cody / Claude Code can query DriftLens as context.
 **Why:** This is how DriftLens becomes the **context layer for the AI-coding ecosystem**, not just another IDE extension.
 
