@@ -471,31 +471,75 @@ analysis; the diagram toggle is SPEC-021)*.
 
 ---
 
-### ⛔ SPEC-020: MCP Server (Context API)
-**Component:** server | **Phase:** 1.5 | **Status:** ⛔ (CRITICAL — the AI-era wedge)
+### 🟡 SPEC-020: MCP Server (Context API)
+**Component:** server | **Phase:** 1.5 | **Status:** 🟡 in progress (`spec/020-mcp-server`)
 **Goal:** Expose the graph as MCP (Model Context Protocol) tools so Cursor / Continue / Cody / Claude Code can query DriftLens as context.
 **Why:** This is how DriftLens becomes the **context layer for the AI-coding ecosystem**, not just another IDE extension.
 
-**Technical decisions to make:**
-- [ ] MCP server runtime: stdio (subprocess) vs HTTP/SSE?
-- [ ] Tool surface: which queries to expose first?
-  - `query_component(name)` → subgraph + docs + specs + owners
-  - `find_owners(file_or_symbol)` → ownership chain
-  - `get_decision_history(component)` → ADRs + specs affecting this component
-  - `find_drift(since)` → drift introduced since a commit/branch
-  - `get_health()` → current architecture health + breakdown
-- [ ] Token budgeting: cap response size, allow paging.
-- [ ] Auth: local-only for v1 (stdio); remote in Phase 2.
+**Technical decisions (resolved for SPEC-020):**
+- [x] **Runtime: stdio (subprocess), local-first.** Honors CD-001 (local-first). HTTP/SSE
+  + remote auth are explicitly Phase 2 — the dependency listed as SPEC-017 (persistence)
+  is *not* required for v1 (the in-memory graph from SPEC-016 + the Builders from
+  SPEC-018/019 carry everything we need). Effective dependency: SPEC-016.
+- [x] **Package shape: separate `packages/mcp-server` package.** Per open question #2.
+  Depends on `@driftlens/engine` via workspace protocol; the engine stays IDE-bundle-safe
+  and the server is independently invokable (`npx @driftlens/mcp-server` or
+  `node packages/mcp-server/dist/index.js`).
+- [x] **SDK: `@modelcontextprotocol/sdk` (TS, v1.29.x).** Official, ESM + CJS dual,
+  supports the `tools/list` + `tools/call` surfaces we need. No hand-rolled JSON-RPC.
+- [x] **Tool surface (v1, narrowed to what the unified model answers today):**
+  - `query_component(name)` → service context subgraph (members, symbols, internal
+    imports, owner, declared deps, governing ADRs, targeting specs). Backed by
+    `createQuery(name).component(name)`.
+  - `find_owners(file_or_symbol)` → ownership chain (file → service → owner) via
+    `findByPath` + `firstMatchingService`.
+  - `get_decision_history(component)` → ADRs + specs affecting a service, via
+    `decisionsFor(name)` ∪ `specsFor(name)`.
+  - `get_health()` → current architecture health (`detectDriftUnified` report:
+    healthScore + events + violatingEdges).
+  - **Deferred:** `find_drift(since)` requires time-series (SPEC-022 temporal view);
+    added as a stub returning "not yet implemented" so the tool list stays stable
+    for clients that probe it.
+- [x] **Token budgeting:** hard per-tool cap at **4000 tokens** (~16KB of UTF-8 prose),
+  enforced by a single `capTokens` helper. Subgraphs are rendered to a compact
+  Markdown/JSON text form before capping; if a response would exceed the cap, the
+  server returns the_tools_first_page + a `cursor` (`lastNodeId`/`lastEdgeId`) the
+  client passes back to page forward. Same cap on every tool for predictable UX.
+- [x] **Auth:** none for v1 (stdio = local). The server reads a workspace root from
+  `--workspace <path>` (or `process.cwd()`); no secrets, no network.
 
-**Sub-tasks:**
-1. Pick MCP SDK (TypeScript: `@modelcontextprotocol/sdk`)
-2. Implement server with stdio transport
-3. Register tools listed above
-4. Test from Cursor: configure MCP server, query "what's the architecture of checkout service?"
-5. Measure token usage vs equivalent README query
+**Decision-change note (dependency):** the spec sheet lists SPEC-017 as a dependency,
+but the MCP server needs only the in-memory unified graph + drift detector, both from
+SPEC-016 (now ✅). Persistence picks up MCP-server queries for free when it lands
+(MCP tools are stateless readers over whatever graph is loaded). Effective dependency:
+SPEC-016 (and transitively SPEC-018/019 for the doc/spec context tools return).
 
-**Depends on:** SPEC-016, SPEC-017
-**Acceptance:** From Cursor, a query returns a structured subgraph using <2k tokens; the response includes doc context, ADRs, and owners.
+**Sub-tasks (execute in order):**
+1. [ ] Add `packages/mcp-server` package (pnpm workspace, tsconfig, package.json,
+   bin entry, README wiring).
+2. [ ] Implement stdio MCP server bootstrap using `@modelcontextprotocol/sdk`.
+3. [ ] Implement `query_component`, `find_owners`, `get_decision_history`, `get_health`
+   tools, wrapping the engine's query surface.
+4. [ ] Implement token-budgeting helper + paginated response shape for `query_component`.
+5. [ ] Wire a sample-repo driver script (`scripts/mcp-server-sample.mjs`) that boots the
+   server against `examples/sample-repo` and prints a tool listing + one tool result.
+6. [ ] Add unit tests for tool handlers + token cap + pagination.
+7. [ ] Document server setup for Cursor / Claude Code / Continue in
+   `docs/mcp-server.md`.
+
+**Depends on:** SPEC-016 (SPEC-017 listed in the plan but not required — see note above)
+**Acceptance (must verify before closing the spec):**
+- [ ] Server boots via stdio and answers `tools/list` with the four tool definitions.
+- [ ] `query_component("checkout")` returns a structured subgraph using <2k tokens;
+      the response includes doc context (ADRs), spec context (targeting specs), and owner.
+- [ ] Token cap enforced — oversized responses are paginated rather than truncated silently.
+- [ ] `find_owners`, `get_decision_history`, `get_health` all return correct results on
+      the sample repo.
+- [ ] A driver script proves end-to-end invocation without a live MCP client
+      (`node scripts/mcp-server-sample.mjs` exits 0 and prints tool output).
+- [ ] `pnpm -r test` green; `pnpm -r typecheck` clean; sample drift report unchanged.
+- [ ] *Human-in-the-loop verification (Cursor):* deferred to a follow-up commit; the
+      driver script is the deterministic surrogate for "from Cursor, a query returns …".
 **Effort:** M
 
 ---
